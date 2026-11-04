@@ -1,0 +1,7 @@
+source_currency,target_currency,rate
+USD,EUR,0.90
+EUR,USD,1.10
+EUR,GBP,0.85
+GBP,EUR,1.15
+GBP,USD,1.25
+USD,GBP,0.78
