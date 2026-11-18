@@ -134,6 +134,14 @@ std::size_t RateLoader::load_from_csv(const std::string& filepath, CurrencyGraph
     while (std::getline(file, line)) {
         ++line_number;
 
+        // Strip a UTF-8 BOM (EF BB BF), only at the very start of the file
+        if (line_number == 1 && line.size() >= 3 &&
+            static_cast<unsigned char>(line[0]) == 0xEF &&
+            static_cast<unsigned char>(line[1]) == 0xBB &&
+            static_cast<unsigned char>(line[2]) == 0xBF) {
+            line.erase(0, 3);
+        }
+
         // Strip carriage return if present
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();

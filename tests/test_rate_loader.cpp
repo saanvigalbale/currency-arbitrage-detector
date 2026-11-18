@@ -364,6 +364,95 @@ void test_header_only_csv() {
     std::cout << "[PASS] test_header_only_csv" << std::endl;
 }
 
+void test_utf8_bom_with_header() {
+    std::cout << "[RUN] test_utf8_bom_with_header..." << std::endl;
+    TempCSVFile temp("test_bom_header.csv",
+        "\xEF\xBB\xBF" "source_currency,target_currency,rate\r\n"
+        "USD,EUR,0.92\r\n"
+        "EUR,GBP,0.85\r\n"
+    );
+
+    CurrencyGraph graph;
+    std::size_t loaded = RateLoader::load_from_csv(temp.path, graph);
+
+    assert(loaded == 2);
+    assert(graph.vertex_count() == 3);
+    assert(graph.edge_count() == 2);
+    assert(graph.has_currency("USD"));
+    assert(graph.has_currency("EUR"));
+    assert(graph.has_currency("GBP"));
+
+    const auto usd = graph.get_currency_id("USD").value();
+    const auto eur = graph.get_currency_id("EUR").value();
+    const auto gbp = graph.get_currency_id("GBP").value();
+
+    const Edge& e0 = graph.get_edge(0);
+    assert(e0.from == usd && e0.to == eur && e0.original_rate == 0.92);
+    const Edge& e1 = graph.get_edge(1);
+    assert(e1.from == eur && e1.to == gbp && e1.original_rate == 0.85);
+
+    std::cout << "[PASS] test_utf8_bom_with_header" << std::endl;
+}
+
+void test_utf8_bom_without_header() {
+    std::cout << "[RUN] test_utf8_bom_without_header..." << std::endl;
+    // BOM glued to the first currency code of a headerless file
+    TempCSVFile temp("test_bom_no_header.csv",
+        "\xEF\xBB\xBF" "USD,EUR,0.92\n"
+        "EUR,GBP,0.85\n"
+    );
+
+    CurrencyGraph graph;
+    std::size_t loaded = RateLoader::load_from_csv(temp.path, graph);
+
+    assert(loaded == 2);
+    assert(graph.vertex_count() == 3);
+    // Currency must be exactly "USD", not "\xEF\xBB\xBFUSD"
+    assert(graph.has_currency("USD"));
+    assert(graph.get_edge(0).original_rate == 0.92);
+    assert(graph.get_edge(0).from == graph.get_currency_id("USD").value());
+
+    std::cout << "[PASS] test_utf8_bom_without_header" << std::endl;
+}
+
+void test_utf8_bom_only_stripped_at_file_start() {
+    std::cout << "[RUN] test_utf8_bom_only_stripped_at_file_start..." << std::endl;
+
+    // A BOM on line 2 is data, not a file marker: it must still be rejected,
+    // and the error must report line 2 (line numbering unaffected by the BOM on line 1).
+    TempCSVFile temp("test_bom_midfile.csv",
+        "\xEF\xBB\xBF" "USD,EUR,0.92\n"
+        "\xEF\xBB\xBF" "EUR,GBP,0.85\n"
+    );
+    CurrencyGraph graph;
+    bool threw = false;
+    try {
+        RateLoader::load_from_csv(temp.path, graph);
+    } catch (const RateLoaderException& ex) {
+        threw = true;
+        assert(ex.line_number() == 2);
+    }
+    assert(threw);
+
+    // A BOM-only first line is just a blank line; later lines keep their numbers.
+    TempCSVFile temp_blank("test_bom_blank_first.csv",
+        "\xEF\xBB\xBF" "\n"
+        "USD,EUR,0.92\n"
+        "EUR,GBP,abc\n"
+    );
+    CurrencyGraph graph2;
+    bool threw2 = false;
+    try {
+        RateLoader::load_from_csv(temp_blank.path, graph2);
+    } catch (const RateLoaderException& ex) {
+        threw2 = true;
+        assert(ex.line_number() == 3);
+    }
+    assert(threw2);
+
+    std::cout << "[PASS] test_utf8_bom_only_stripped_at_file_start" << std::endl;
+}
+
 int main() {
     std::cout << "========================================" << std::endl;
     std::cout << "Starting RateLoader Unit Tests" << std::endl;
@@ -381,6 +470,9 @@ int main() {
     test_multiple_edges_same_currencies();
     test_empty_csv();
     test_header_only_csv();
+    test_utf8_bom_with_header();
+    test_utf8_bom_without_header();
+    test_utf8_bom_only_stripped_at_file_start();
 
     std::cout << "========================================" << std::endl;
     std::cout << "All RateLoader Tests Passed!" << std::endl;
