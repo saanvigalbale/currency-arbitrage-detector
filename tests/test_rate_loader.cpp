@@ -307,6 +307,63 @@ void test_multiple_edges_same_currencies() {
     std::cout << "[PASS] test_multiple_edges_same_currencies" << std::endl;
 }
 
+void test_empty_csv() {
+    std::cout << "[RUN] test_empty_csv..." << std::endl;
+
+    // Completely empty file: must throw, line_number 0 (file-level)
+    TempCSVFile temp("test_empty.csv", "");
+    CurrencyGraph graph;
+    bool threw = false;
+    try {
+        RateLoader::load_from_csv(temp.path, graph);
+    } catch (const RateLoaderException& ex) {
+        threw = true;
+        assert(ex.line_number() == 0);
+        // Message must mention the absence of valid rows
+        const std::string msg(ex.what());
+        assert(msg.find("No valid exchange-rate rows found") != std::string::npos);
+    }
+    assert(threw);
+    assert(graph.edge_count() == 0);
+
+    std::cout << "[PASS] test_empty_csv" << std::endl;
+}
+
+void test_header_only_csv() {
+    std::cout << "[RUN] test_header_only_csv..." << std::endl;
+
+    // File contains only the header row: must throw, line_number 0 (file-level)
+    TempCSVFile temp("test_header_only.csv",
+        "source_currency,target_currency,rate\n"
+    );
+    CurrencyGraph graph;
+    bool threw = false;
+    try {
+        RateLoader::load_from_csv(temp.path, graph);
+    } catch (const RateLoaderException& ex) {
+        threw = true;
+        assert(ex.line_number() == 0);
+        const std::string msg(ex.what());
+        assert(msg.find("No valid exchange-rate rows found") != std::string::npos);
+    }
+    assert(threw);
+    assert(graph.edge_count() == 0);
+
+    // Blank-lines-only file (not empty bytes, but no data) must also throw
+    TempCSVFile temp_blanks("test_blanks_only.csv", "\n\n   \n\t\n");
+    CurrencyGraph graph2;
+    bool threw2 = false;
+    try {
+        RateLoader::load_from_csv(temp_blanks.path, graph2);
+    } catch (const RateLoaderException& ex) {
+        threw2 = true;
+        assert(ex.line_number() == 0);
+    }
+    assert(threw2);
+
+    std::cout << "[PASS] test_header_only_csv" << std::endl;
+}
+
 int main() {
     std::cout << "========================================" << std::endl;
     std::cout << "Starting RateLoader Unit Tests" << std::endl;
@@ -322,6 +379,8 @@ int main() {
     test_nan_and_infinity();
     test_missing_file();
     test_multiple_edges_same_currencies();
+    test_empty_csv();
+    test_header_only_csv();
 
     std::cout << "========================================" << std::endl;
     std::cout << "All RateLoader Tests Passed!" << std::endl;

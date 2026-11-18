@@ -274,6 +274,40 @@ void test_list_samples_formatting() {
     std::cout << "[PASS] test_list_samples_formatting" << std::endl;
 }
 
+void test_csv_error_formatting() {
+    std::cout << "[RUN] test_csv_error_formatting..." << std::endl;
+
+    // 1. Line-specific error (line_number > 0)
+    const std::string err_line = ArbitrageReporter::format_csv_error(
+        "data/test.csv",
+        "CSV Error (line 7): Rate must be strictly positive: '-0.5'",
+        7
+    );
+    assert(err_line.find("CSV Load Error") != std::string::npos);
+    assert(err_line.find("data/test.csv") != std::string::npos);
+    assert(err_line.find("7") != std::string::npos);               // line number
+    assert(err_line.find("Rate must be strictly positive") != std::string::npos);
+    assert(err_line.find("Suggestion:") != std::string::npos);
+    assert(err_line.find("source_currency,target_currency,rate") != std::string::npos);
+    assert(err_line.find("-h/--help") != std::string::npos || err_line.find("--help") != std::string::npos);
+    assert(err_line.find("----") != std::string::npos);            // section separator
+
+    // 2. File-level error (line_number == 0 — no "Line:" field expected)
+    const std::string err_file = ArbitrageReporter::format_csv_error(
+        "missing.csv",
+        "CSV Error: Could not open file: missing.csv",
+        0
+    );
+    assert(err_file.find("CSV Load Error") != std::string::npos);
+    assert(err_file.find("missing.csv") != std::string::npos);
+    assert(err_file.find("Could not open file") != std::string::npos);
+    assert(err_file.find("Suggestion:") != std::string::npos);
+    // "Line:" must NOT appear when line_number is 0
+    assert(err_file.find("Line:") == std::string::npos);
+
+    std::cout << "[PASS] test_csv_error_formatting" << std::endl;
+}
+
 int main() {
     std::cout << "========================================" << std::endl;
     std::cout << "Starting End-to-End Workflow Tests" << std::endl;
@@ -287,6 +321,7 @@ int main() {
     test_capital_argument_validation();
     test_help_and_usage_interface();
     test_list_samples_formatting();
+    test_csv_error_formatting();
 
     std::cout << "========================================" << std::endl;
     std::cout << "All End-to-End Tests Passed!" << std::endl;

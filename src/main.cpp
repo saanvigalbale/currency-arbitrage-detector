@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     // Check for unknown options
     if (!first_arg.empty() && first_arg[0] == '-') {
         std::cerr << "Error: Unknown option '" << first_arg
-                  << "'. Use -h or --help for usage instructions.\n";
+                  << "'. Use -h/--help for usage instructions.\n";
         return 1;
     }
 
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Loaded " << loaded_edges << " exchange rates across "
                   << graph.vertex_count() << " currencies from: " << filepath << "\n\n";
     } catch (const RateLoaderException& ex) {
-        std::cerr << "Error loading exchange rates: " << ex.what() << "\n";
+        std::cerr << ArbitrageReporter::format_csv_error(filepath, ex.what(), ex.line_number());
         return 1;
     } catch (const std::exception& ex) {
         std::cerr << "Unexpected error: " << ex.what() << "\n";

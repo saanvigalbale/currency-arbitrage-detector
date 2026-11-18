@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 
 namespace {
 
@@ -116,7 +117,7 @@ void test_cli_unknown_option(const std::string& exe) {
     auto res = execute_cli(exe, "-v");
     assert(res.exit_code != 0);
     assert(res.output.find("Error: Unknown option '-v'") != std::string::npos);
-    assert(res.output.find("Use -h or --help for usage instructions") != std::string::npos);
+    assert(res.output.find("Use -h/--help for usage instructions") != std::string::npos);
     std::cout << "[PASS] test_cli_unknown_option" << std::endl;
 }
 
@@ -167,6 +168,59 @@ void test_cli_list_samples(const std::string& exe) {
     std::cout << "[PASS] test_cli_list_samples" << std::endl;
 }
 
+void test_cli_invalid_csv(const std::string& exe) {
+    std::cout << "[RUN] test_cli_invalid_csv..." << std::endl;
+
+    // --- Case 1: CSV with an invalid (negative) rate on line 2 ---
+    const std::string bad_csv_path =
+        (std::filesystem::temp_directory_path() / "test_cli_bad_rate.csv").string();
+    {
+        std::ofstream out(bad_csv_path, std::ios::binary);
+        out << "source_currency,target_currency,rate\n"
+            << "USD,EUR,0.92\n"
+            << "EUR,GBP,-0.85\n";   // negative rate — invalid
+    }
+
+#ifdef _WIN32
+    const std::string quoted_path = "\"" + bad_csv_path + "\"";
+#else
+    const std::string quoted_path = "\"" + bad_csv_path + "\"";
+#endif
+
+    auto res_bad = execute_cli(exe, quoted_path);
+
+    // Must exit with non-zero code
+    assert(res_bad.exit_code != 0);
+    // Structured diagnostic heading must appear
+    assert(res_bad.output.find("CSV Load Error") != std::string::npos);
+    // File path must be echoed
+    assert(res_bad.output.find("test_cli_bad_rate.csv") != std::string::npos);
+    // Specific reason must be surfaced
+    assert(res_bad.output.find("Rate must be strictly positive") != std::string::npos);
+    // Suggestion block must appear
+    assert(res_bad.output.find("Suggestion:") != std::string::npos);
+
+    std::filesystem::remove(bad_csv_path);
+
+    // --- Case 2: Completely empty CSV ---
+    const std::string empty_csv_path =
+        (std::filesystem::temp_directory_path() / "test_cli_empty.csv").string();
+    {
+        std::ofstream out(empty_csv_path, std::ios::binary);
+        // write nothing
+    }
+
+    auto res_empty = execute_cli(exe, "\"" + empty_csv_path + "\"");
+
+    assert(res_empty.exit_code != 0);
+    assert(res_empty.output.find("CSV Load Error") != std::string::npos);
+    assert(res_empty.output.find("No valid exchange-rate rows found") != std::string::npos);
+
+    std::filesystem::remove(empty_csv_path);
+
+    std::cout << "[PASS] test_cli_invalid_csv" << std::endl;
+}
+
 int main() {
     std::cout << "========================================" << std::endl;
     std::cout << "Starting Actual CLI Executable Tests" << std::endl;
@@ -184,6 +238,7 @@ int main() {
     test_cli_too_many_arguments(exe, sample_csv);
     test_cli_csv_only(exe, sample_csv);
     test_cli_csv_with_custom_capital(exe, sample_csv);
+    test_cli_invalid_csv(exe);
 
     std::cout << "========================================" << std::endl;
     std::cout << "All Actual CLI Executable Tests Passed!" << std::endl;
