@@ -1,11 +1,13 @@
 #include "RateLoader.hpp"
 
 #include <fstream>
+#include <istream>
 #include <sstream>
 #include <vector>
 #include <cctype>
 #include <cmath>
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -43,33 +45,34 @@ std::string to_lower_string(std::string str) {
     return str;
 }
 
+// Lower-cases and maps spaces to underscores so "Source Currency" matches "source_currency".
+std::string normalize_header_token(std::string str) {
+    str = to_lower_string(std::move(str));
+    std::replace(str.begin(), str.end(), ' ', '_');
+    return str;
+}
+
 bool is_header_row(const std::string& src, const std::string& tgt, const std::string& rate_str) {
-    const std::string lower_rate = to_lower_string(rate_str);
-    if (lower_rate == "rate" || lower_rate == "exchange_rate" || lower_rate == "price") {
+    const std::string rate = normalize_header_token(rate_str);
+    if (rate == "rate" || rate == "exchange_rate" || rate == "fx_rate" || rate == "price") {
         return true;
     }
 
-    const std::string lower_src = to_lower_string(src);
-    if (lower_src == "source_currency" || lower_src == "source" || lower_src == "from") {
+    const std::string source = normalize_header_token(src);
+    if (source == "source_currency" || source == "source" || source == "from" ||
+        source == "from_currency" || source == "base" || source == "base_currency") {
         return true;
     }
 
-    const std::string lower_tgt = to_lower_string(tgt);
-    if (lower_tgt == "target_currency" || lower_tgt == "target" || lower_tgt == "to") {
+    const std::string target = normalize_header_token(tgt);
+    if (target == "target_currency" || target == "target" || target == "to" ||
+        target == "to_currency" || target == "quote" || target == "quote_currency") {
         return true;
     }
 
-    // If the rate column cannot be parsed as a number at all, it's a header
-    try {
-        std::size_t idx = 0;
-        std::stod(rate_str, &idx);
-        if (idx != rate_str.size()) {
-            return true;
-        }
-    } catch (...) {
-        return true;
-    }
-
+    // A first row is a header only when one of its columns carries a recognised header
+    // keyword. An unparseable rate (e.g. 'USD,EUR,abc') is malformed data and must be
+    // reported with its line number by the normal validation, not silently skipped.
     return false;
 }
 
@@ -120,12 +123,12 @@ double parse_rate(const std::string& str, std::size_t line_number) {
 
 } // anonymous namespace
 
-std::size_t RateLoader::load_from_csv(const std::string& filepath, CurrencyGraph& graph) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        throw RateLoaderException("Could not open file: " + filepath, 0);
-    }
+namespace {
 
+// Shared implementation. `source_label` is the file path when loading from a file and
+// empty when loading from an arbitrary stream; it only affects the wording of
+// file-level messages.
+std::size_t load_rows(std::istream& file, CurrencyGraph& graph, const std::string& source_label) {
     std::string line;
     std::size_t line_number = 0;
     std::size_t edges_loaded = 0;
@@ -191,16 +194,38 @@ std::size_t RateLoader::load_from_csv(const std::string& filepath, CurrencyGraph
     }
 
     if (file.bad()) {
-        throw RateLoaderException("I/O error occurred while reading file: " + filepath, line_number);
+        throw RateLoaderException(
+            source_label.empty()
+                ? std::string("I/O error occurred while reading input")
+                : "I/O error occurred while reading file: " + source_label,
+            line_number
+        );
     }
 
     if (edges_loaded == 0) {
         throw RateLoaderException(
-            "No valid exchange-rate rows found. "
-            "The file may be empty or contain only a header row: " + filepath,
+            source_label.empty()
+                ? std::string("No valid exchange-rate rows found. "
+                              "The input may be empty or contain only a header row.")
+                : "No valid exchange-rate rows found. "
+                  "The file may be empty or contain only a header row: " + source_label,
             0
         );
     }
 
     return edges_loaded;
+}
+
+} // anonymous namespace
+
+std::size_t RateLoader::load_from_csv(const std::string& filepath, CurrencyGraph& graph) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw RateLoaderException("Could not open file: " + filepath, 0);
+    }
+    return load_rows(file, graph, filepath);
+}
+
+std::size_t RateLoader::load_from_stream(std::istream& input, CurrencyGraph& graph) {
+    return load_rows(input, graph, "");
 }

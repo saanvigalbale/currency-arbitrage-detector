@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Currency Arbitrage Detector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">CAD<span>.</span></div>
+    <div class="top-label">CURRENCY MARKET ANALYSIS</div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">FINANCIAL ANALYSIS TOOL</p>
+      <h1>Currency Arbitrage<br><em>Detector</em></h1>
+      <p class="subtitle">
+        Identify profitable exchange-rate cycles using graph-based
+        arbitrage detection.
+      </p>
+    </section>
+
+    <section class="workspace">
+      <div class="section-heading">
+        <h2>Analyse exchange rates</h2>
+        <span class="status">● SYSTEM READY</span>
+      </div>
+
+      <form id="analysisForm">
+        <label for="csvFile">Exchange rate dataset</label>
+        <div class="upload-area">
+          <input type="file" id="csvFile" accept=".csv" required>
+          <div class="upload-text">
+            <span class="upload-icon">↑</span>
+            <strong>Choose a CSV file</strong>
+            <small>Upload your currency exchange rates</small>
+          </div>
+          <p id="fileName">No file selected</p>
+        </div>
+
+        <label for="capital">Starting capital</label>
+        <div class="capital-input">
+          <input id="capital" type="number" min="0.01"
+                 step="any" value="50000" required>
+        </div>
+
+        <button type="submit" id="analyzeBtn">Analyse market <span>→</span></button>
+      </form>
+
+      <div id="loading" hidden>Analysing exchange rates...</div>
+      <div id="error" class="error" hidden></div>
+    </section>
+
+    <section id="results" hidden>
+      <div class="result-heading">
+        <div>
+          <p class="eyebrow">ANALYSIS REPORT</p>
+          <h2 id="resultTitle"></h2>
+        </div>
+        <span id="resultBadge" class="badge"></span>
+      </div>
+
+      <div id="cycleSection" class="cycle-section" hidden>
+        <p class="eyebrow">DETECTED CONVERSION CYCLE</p>
+        <h3 id="cycle"></h3>
+        <div id="steps" class="steps"></div>
+      </div>
+
+      <div id="metrics" class="metrics" hidden>
+        <div class="metric">
+          <small>PROFIT</small>
+          <strong id="profit"></strong>
+        </div>
+        <div class="metric">
+          <small>PROFIT PERCENTAGE</small>
+          <strong id="profitPercent"></strong>
+        </div>
+        <div class="metric">
+          <small>FINAL CAPITAL</small>
+          <strong id="finalCapital"></strong>
+        </div>
+        <div class="metric">
+          <small>MULTIPLIER</small>
+          <strong id="multiplier"></strong>
+        </div>
+      </div>
+
+      <p id="noArbitrage" class="no-arbitrage" hidden>
+        No profitable arbitrage cycle was found in this dataset.
+      </p>
+    </section>
+  </main>
+
+  <footer> CURRENCY ARBITRAGE DETECTOR · C++ POWERED ANALYSIS </footer>
+  <script src="script.js"></script>
+</body>
+</html>

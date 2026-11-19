@@ -20,6 +20,8 @@ add_library(arbitrage_core STATIC
     src/ArbitrageDetector.cpp
     src/RateLoader.cpp
     src/ArbitrageReporter.cpp
+    src/JsonWriter.cpp
+    src/AnalysisService.cpp
 )
 
 target_include_directories(arbitrage_core PUBLIC
@@ -117,3 +119,32 @@ else()
 endif()
 
 add_test(NAME TestCliExecutable COMMAND test_cli)
+
+# 6. JSON serialization and structured analysis tests
+add_executable(test_analysis_json
+    tests/test_analysis_json.cpp
+)
+target_link_libraries(test_analysis_json PRIVATE arbitrage_core)
+
+if(MSVC)
+    target_compile_options(test_analysis_json PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(test_analysis_json PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+add_test(NAME TestAnalysisJson COMMAND test_analysis_json)
+
+# Keep assert() active in every test executable, including Release builds.
+# CMake's Release flags define NDEBUG, which compiles assert() away and would turn the
+# checks in these tests into silent no-ops. Only the test targets are affected;
+# arbitrage_core and currency_arbitrage keep NDEBUG in Release.
+# Target options come after CMAKE_CXX_FLAGS_<CONFIG> on the command line, so the undefine wins.
+foreach(test_target IN ITEMS
+        test_graph test_arbitrage test_rate_loader
+        test_end_to_end test_cli test_analysis_json)
+    if(MSVC)
+        target_compile_options(${test_target} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${test_target} PRIVATE -UNDEBUG)
+    endif()
+endforeach()

@@ -2,12 +2,80 @@
 #include "RateLoader.hpp"
 #include "ArbitrageDetector.hpp"
 #include "ArbitrageReporter.hpp"
+#include "AnalysisService.hpp"
 
 #include <iostream>
 #include <string>
+#include <vector>
 #include <cmath>
 
+namespace {
+
+// Same rule as the text-mode capital check below: a strictly positive, finite number.
+bool parse_capital(const std::string& text, double& out) {
+    try {
+        std::size_t idx = 0;
+        const double val = std::stod(text, &idx);
+        if (idx != text.size() || std::isnan(val) || std::isinf(val) || val <= 0.0) {
+            return false;
+        }
+        out = val;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// --json mode: stdout carries exactly one JSON document (no banner or other text).
+// Exit code is 0 for "arbitrage" and "no_arbitrage", 1 for "error".
+int run_json_mode(const std::vector<std::string>& args) {
+    auto emit = [](const AnalysisResult& result) {
+        std::cout << AnalysisService::to_json(result) << "\n";
+        return result.status == AnalysisStatus::Error ? 1 : 0;
+    };
+
+    if (args.empty()) {
+        return emit(AnalysisService::make_error(
+            "usage", "Missing CSV file path. Usage: currency_arbitrage <path-to-rates.csv> [starting_capital] --json"));
+    }
+    if (!args[0].empty() && args[0][0] == '-') {
+        return emit(AnalysisService::make_error(
+            "usage", "Unknown option '" + args[0] + "'. Use -h/--help for usage instructions."));
+    }
+    if (args.size() > 2) {
+        return emit(AnalysisService::make_error(
+            "usage", "Too many arguments provided. Expected at most 2 arguments (<path-to-rates.csv> [starting_capital])."));
+    }
+
+    double capital = ArbitrageReporter::DEFAULT_STARTING_CAPITAL;
+    if (args.size() == 2 && !parse_capital(args[1], capital)) {
+        return emit(AnalysisService::make_error(
+            "input", "Starting capital must be a strictly positive number. Provided: '" + args[1] + "'"));
+    }
+
+    return emit(AnalysisService::analyze_file(args[0], capital));
+}
+
+} // anonymous namespace
+
 int main(int argc, char* argv[]) {
+    // Machine-readable mode: '--json' may appear anywhere among the arguments.
+    {
+        bool json_mode = false;
+        std::vector<std::string> positional;
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--json") {
+                json_mode = true;
+            } else {
+                positional.push_back(arg);
+            }
+        }
+        if (json_mode) {
+            return run_json_mode(positional);
+        }
+    }
+
     std::cout << ArbitrageReporter::format_header() << std::endl;
 
     // No arguments provided: show concise usage
